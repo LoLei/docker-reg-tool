@@ -48,33 +48,27 @@ shift
 ACTION="$1"
 shift
 
-CREDS=""
-if [[ -f "~/.docker/config.json" ]]; then
-    CREDS="Authorization: Basic $(jq -r '.auths."'$REG'".auth' < ~/.docker/config.json)"
-elif [[ -v "BASIC_AUTH" ]]; then
-    CREDS="Authorization: Basic $(echo -n $BASIC_AUTH|base64)"
-fi
-
+CREDS="Authorization: Basic $(jq -r '.auths."'$REG'".auth' < ~/.docker/config.json)"
 
 case "$ACTION" in
     list)
         if [ $# -eq 1 ]; then
             repo=${1}
             if [ -n "$repo" ]; then
-                curl -s --header "$CREDS" $PROTO$REG/v2/$repo/tags/list | jq -r '.tags|.[]'
+                curl -k -s --header "$CREDS" $PROTO$REG/v2/$repo/tags/list | jq -r '.tags|.[]'
             fi
         else
-            curl -s --header "$CREDS" $PROTO$REG/v2/_catalog | jq -r '.repositories|.[]'
+            curl -k -s --header "$CREDS" $PROTO$REG/v2/_catalog | jq -r '.repositories|.[]'
         fi
 
         ;;
     delete)
         repo=$1
         tag=$2
-        digest=$(curl -v -s --header "$CREDS" -H "Accept:application/vnd.docker.distribution.manifest.v2+json" $PROTO$REG/v2/$repo/manifests/$tag 2>&1 |grep "< Docker-Content-Digest:"|awk '{print $3}')
+        digest=$(curl -k -v -s --header "$CREDS" -H "Accept:application/vnd.docker.distribution.manifest.v2+json" $PROTO$REG/v2/$repo/manifests/$tag 2>&1 |grep "< Docker-Content-Digest:"|awk '{print $3}')
         digest=${digest//[$'\t\r\n']}
         echo "DIGEST: $digest"
-        result=$(curl --header "$CREDS"  -s -o /dev/null -w "%{http_code}" -H "Accept:application/vnd.docker.distribution.manifest.v2+json" -X DELETE "$PROTO$REG/v2/$repo/manifests/$digest")
+        result=$(curl -k --header "$CREDS"  -s -o /dev/null -w "%{http_code}" -H "Accept:application/vnd.docker.distribution.manifest.v2+json" -X DELETE "$PROTO$REG/v2/$repo/manifests/$digest")
         if [ $result -eq 202 ]; then
             echo "Successfully deleted"
             exit 0
